@@ -1,6 +1,1 @@
-fastapi
-uvicorn[standard]
-python-multipart
-opencv-python-headless
 anthropic
-python-dotenv

@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Soccer Gameplay Feedback</title>
-  <link rel="stylesheet" href="/static/styles.css" />
+  <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
   <main class="container">
@@ -12,7 +12,8 @@
       <h1>⚽ Soccer Gameplay Feedback</h1>
       <p class="subtitle">
         Upload a gameplay clip and get honest, AI-generated coaching feedback on
-        one player — identified by jersey number and color.
+        one player — identified by jersey number and color. Frames are extracted
+        in your browser, so only a few small images are ever uploaded.
       </p>
     </header>
 
@@ -31,9 +32,12 @@
       </div>
 
       <div class="field">
-        <label for="video">Gameplay video (MP4, MOV, or AVI)</label>
-        <input type="file" id="video" name="video"
-               accept="video/mp4,video/quicktime,video/x-msvideo" required />
+        <label for="video">Gameplay video (MP4 / H.264 recommended)</label>
+        <input type="file" id="video" name="video" accept="video/*" required />
+        <span class="hint">
+          Extraction runs in your browser. MP4 works best; some MOV/AVI files
+          can't be decoded by browsers.
+        </span>
       </div>
 
       <button type="submit" id="submit-btn">Analyze gameplay</button>
@@ -41,7 +45,7 @@
 
     <div id="loading" class="loading hidden">
       <div class="spinner"></div>
-      <span>Analyzing gameplay — this can take up to a minute...</span>
+      <span id="loading-text">Working...</span>
     </div>
 
     <div id="error" class="error-box hidden"></div>
@@ -49,6 +53,6 @@
     <section id="results" class="results hidden"></section>
   </main>
 
-  <script src="/static/main.js"></script>
+  <script src="./main.js"></script>
 </body>
 </html>

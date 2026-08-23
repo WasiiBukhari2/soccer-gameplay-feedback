@@ -68,6 +68,12 @@ label {
   color: var(--text);
 }
 
+.hint {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-top: 0.4rem;
+}
+
 input[type="text"],
 input[type="file"] {
   background: var(--panel-2);

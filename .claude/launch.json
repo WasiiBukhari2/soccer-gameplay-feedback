@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "soccer-feedback",
-      "runtimeExecutable": ".venv/Scripts/uvicorn.exe",
-      "runtimeArgs": ["app.main:app", "--reload", "--port", "8000"],
+      "runtimeExecutable": ".venv/Scripts/python.exe",
+      "runtimeArgs": ["dev_server.py"],
       "port": 8000
     }
   ]
