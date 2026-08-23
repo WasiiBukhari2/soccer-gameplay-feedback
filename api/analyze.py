@@ -5,19 +5,19 @@ target player's jersey number/color, calls Claude vision, and returns a
 structured feedback report. No OpenCV, no file writes, no large uploads — the
 whole design fits Vercel's serverless limits.
 
-Everything is inlined in this single file on purpose: Vercel bundles each
-api/*.py file as its own function, so keeping dependencies to `anthropic` + the
-standard library avoids cross-module import surprises at build time.
+Exposes an ASGI ``app`` (FastAPI), which Vercel's modern Python runtime detects
+automatically as the function entrypoint.
 """
 from __future__ import annotations
 
 import json
 import os
-from http.server import BaseHTTPRequestHandler
 
 import anthropic
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 
-MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-opus-4-8")
+MODEL = os.environ.get("ANTHROPIC_MODEL") or "claude-opus-4-8"
 MAX_TOKENS = 4096
 # Defensive cap: the browser sends ~10, but never trust the client.
 MAX_FRAMES = 20
@@ -166,7 +166,7 @@ def _validate(payload: dict) -> tuple[str, str, list[dict]]:
 
 
 def run_analysis(payload: dict) -> dict:
-    """Core logic shared by the Vercel handler and the local dev server."""
+    """Core logic shared by the Vercel app and the local dev server."""
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
         raise ApiError(
@@ -206,36 +206,25 @@ def run_analysis(payload: dict) -> dict:
         raise ApiError(502, f"The AI model returned invalid JSON: {exc}") from exc
 
 
-class handler(BaseHTTPRequestHandler):
-    """Vercel Python entrypoint."""
+app = FastAPI()
 
-    def _send_json(self, status: int, body: dict) -> None:
-        payload = json.dumps(body).encode("utf-8")
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", str(len(payload)))
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.end_headers()
-        self.wfile.write(payload)
 
-    def do_OPTIONS(self) -> None:  # noqa: N802 (name mandated by BaseHTTPRequestHandler)
-        self.send_response(204)
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
-        self.end_headers()
-
-    def do_POST(self) -> None:  # noqa: N802
-        try:
-            length = int(self.headers.get("Content-Length") or 0)
-            raw = self.rfile.read(length) if length else b""
-            try:
-                payload = json.loads(raw or b"{}")
-            except json.JSONDecodeError:
-                raise ApiError(400, "Request body is not valid JSON.")
-            report = run_analysis(payload)
-            self._send_json(200, report)
-        except ApiError as exc:
-            self._send_json(exc.status, {"detail": exc.detail})
-        except Exception as exc:  # noqa: BLE001 — last-resort guard
-            self._send_json(500, {"detail": f"Unexpected server error: {exc}"})
+# Match POST regardless of how Vercel presents the path (with or without the
+# /api/analyze prefix), so routing is never the point of failure.
+@app.post("/{full_path:path}")
+async def analyze(request: Request, full_path: str = "") -> JSONResponse:
+    try:
+        payload = await request.json()
+    except Exception:
+        return JSONResponse(
+            status_code=400, content={"detail": "Request body is not valid JSON."}
+        )
+    try:
+        report = run_analysis(payload)
+        return JSONResponse(status_code=200, content=report)
+    except ApiError as exc:
+        return JSONResponse(status_code=exc.status, content={"detail": exc.detail})
+    except Exception as exc:  # noqa: BLE001 — last-resort guard
+        return JSONResponse(
+            status_code=500, content={"detail": f"Unexpected server error: {exc}"}
+        )
