@@ -12,10 +12,13 @@ from __future__ import annotations
 
 import json
 import os
+from pathlib import Path
 
 import anthropic
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+
+PUBLIC_DIR = Path(__file__).resolve().parent.parent / "public"
 
 MODEL = os.environ.get("ANTHROPIC_MODEL") or "claude-opus-4-8"
 MAX_TOKENS = 4096
@@ -209,8 +212,10 @@ def run_analysis(payload: dict) -> dict:
 app = FastAPI()
 
 
+# --- API ---
 # Match POST regardless of how Vercel presents the path (with or without the
 # /api/analyze prefix), so routing is never the point of failure.
+@app.post("/api/analyze")
 @app.post("/{full_path:path}")
 async def analyze(request: Request, full_path: str = "") -> JSONResponse:
     try:
@@ -228,3 +233,24 @@ async def analyze(request: Request, full_path: str = "") -> JSONResponse:
         return JSONResponse(
             status_code=500, content={"detail": f"Unexpected server error: {exc}"}
         )
+
+
+# --- Frontend ---
+# Serve the static frontend from the same app. Harmless if Vercel serves
+# public/ separately; essential if the runtime routes everything to the ASGI app.
+def _serve(rel_path: str) -> FileResponse | JSONResponse:
+    target = (PUBLIC_DIR / rel_path).resolve()
+    if PUBLIC_DIR == target.parent or PUBLIC_DIR in target.parents:
+        if target.is_file():
+            return FileResponse(target)
+    return JSONResponse(status_code=404, content={"detail": "Not found."})
+
+
+@app.get("/", response_model=None)
+async def index():
+    return _serve("index.html")
+
+
+@app.get("/{asset_path:path}", response_model=None)
+async def static_asset(asset_path: str):
+    return _serve(asset_path or "index.html")

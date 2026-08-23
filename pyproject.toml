@@ -1,0 +1,14 @@
+[project]
+name = "soccer-gameplay-feedback"
+version = "0.1.0"
+description = "AI soccer gameplay feedback — browser-side frame extraction + Claude vision on Vercel"
+requires-python = ">=3.9"
+dependencies = [
+    "anthropic",
+    "fastapi",
+]
+
+# Vercel's Python runtime (CLI 59.x) resolves the serverless entrypoint from
+# here: the ASGI app is api/analyze.py's `app`.
+[tool.vercel]
+entrypoint = "api.analyze:app"
