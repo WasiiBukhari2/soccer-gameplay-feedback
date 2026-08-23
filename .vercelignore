@@ -1,0 +1,14 @@
+# Vercel only hosts the static frontend (the self-contained deploy/ folder).
+# Everything below is backend-only and must not trigger a Python build on Vercel.
+app/
+static/
+uploads/
+.venv/
+__pycache__/
+requirements.txt
+render.yaml
+netlify.toml
+.env
+.env.example
+.claude/
+README.md

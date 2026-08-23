@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: soccer-feedback-api
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: MAX_FRAMES
+        value: "20"
+      - key: SAMPLE_INTERVAL_SEC
+        value: "1"
+      - key: MAX_UPLOAD_MB
+        value: "100"

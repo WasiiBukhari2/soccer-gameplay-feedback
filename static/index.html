@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Soccer Gameplay Feedback</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <main class="container">
+    <header>
+      <h1>⚽ Soccer Gameplay Feedback</h1>
+      <p class="subtitle">
+        Upload a gameplay clip and get honest, AI-generated coaching feedback on
+        one player — identified by jersey number and color.
+      </p>
+    </header>
+
+    <form id="analyze-form" class="panel">
+      <div class="row">
+        <div class="field">
+          <label for="jersey_number">Jersey number</label>
+          <input type="text" id="jersey_number" name="jersey_number"
+                 placeholder="e.g. 10" required />
+        </div>
+        <div class="field">
+          <label for="jersey_color">Jersey color</label>
+          <input type="text" id="jersey_color" name="jersey_color"
+                 placeholder="e.g. red" required />
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="video">Gameplay video (MP4, MOV, or AVI)</label>
+        <input type="file" id="video" name="video"
+               accept="video/mp4,video/quicktime,video/x-msvideo" required />
+      </div>
+
+      <button type="submit" id="submit-btn">Analyze gameplay</button>
+    </form>
+
+    <div id="loading" class="loading hidden">
+      <div class="spinner"></div>
+      <span>Analyzing gameplay — this can take up to a minute...</span>
+    </div>
+
+    <div id="error" class="error-box hidden"></div>
+
+    <section id="results" class="results hidden"></section>
+  </main>
+
+  <script src="/static/main.js"></script>
+</body>
+</html>

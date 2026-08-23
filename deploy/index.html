@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Soccer Gameplay Feedback</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #1e293b;
+      --panel-2: #273449;
+      --accent: #22c55e;
+      --accent-hover: #16a34a;
+      --danger: #ef4444;
+      --warn: #f59e0b;
+      --text: #e2e8f0;
+      --text-muted: #94a3b8;
+      --border: #334155;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      line-height: 1.5;
+    }
+    .container {
+      max-width: 820px;
+      margin: 0 auto;
+      padding: 2rem 1.25rem 4rem;
+    }
+    header h1 { margin: 0 0 0.35rem; font-size: 2rem; }
+    .subtitle { color: var(--text-muted); margin: 0 0 1.5rem; }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+    }
+    .row { display: flex; gap: 1rem; }
+    .row .field { flex: 1; }
+    .field { margin-bottom: 1.1rem; display: flex; flex-direction: column; }
+    label {
+      font-size: 0.9rem;
+      font-weight: 600;
+      margin-bottom: 0.4rem;
+      color: var(--text);
+    }
+    input[type="text"], input[type="file"] {
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      padding: 0.65rem 0.75rem;
+      font-size: 1rem;
+    }
+    input[type="text"]:focus { outline: none; border-color: var(--accent); }
+    input[type="file"] { padding: 0.55rem; }
+    button {
+      background: var(--accent);
+      color: #05240f;
+      border: none;
+      border-radius: 8px;
+      padding: 0.75rem 1.25rem;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      width: 100%;
+      transition: background 0.15s ease;
+    }
+    button:hover:not(:disabled) { background: var(--accent-hover); }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    .hidden { display: none !important; }
+    .loading {
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+      margin-top: 1.5rem;
+      color: var(--text-muted);
+    }
+    .spinner {
+      width: 22px;
+      height: 22px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .error-box {
+      margin-top: 1.5rem;
+      background: rgba(239, 68, 68, 0.12);
+      border: 1px solid var(--danger);
+      color: #fecaca;
+      border-radius: 10px;
+      padding: 1rem 1.15rem;
+    }
+    .results {
+      margin-top: 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+    .result-section {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+    }
+    .result-section h2 { margin: 0 0 0.9rem; font-size: 1.2rem; }
+    .warn-box {
+      background: rgba(245, 158, 11, 0.12);
+      border: 1px solid var(--warn);
+      color: #fde68a;
+      border-radius: 10px;
+      padding: 1rem 1.15rem;
+    }
+    .frame-card {
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.8rem 1rem;
+      margin-bottom: 0.7rem;
+    }
+    .frame-card:last-child { margin-bottom: 0; }
+    .frame-label {
+      font-weight: 700;
+      color: var(--accent);
+      font-size: 0.85rem;
+      margin-bottom: 0.25rem;
+    }
+    .result-section ul { margin: 0; padding-left: 1.25rem; }
+    .result-section li { margin-bottom: 0.4rem; }
+    .muted { color: var(--text-muted); }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <header>
+      <h1>⚽ Soccer Gameplay Feedback</h1>
+      <p class="subtitle">
+        Upload a gameplay clip and get honest, AI-generated coaching feedback on
+        one player — identified by jersey number and color.
+      </p>
+    </header>
+
+    <form id="analyze-form" class="panel">
+      <div class="row">
+        <div class="field">
+          <label for="jersey_number">Jersey number</label>
+          <input type="text" id="jersey_number" name="jersey_number"
+                 placeholder="e.g. 10" required />
+        </div>
+        <div class="field">
+          <label for="jersey_color">Jersey color</label>
+          <input type="text" id="jersey_color" name="jersey_color"
+                 placeholder="e.g. red" required />
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="video">Gameplay video (MP4, MOV, or AVI)</label>
+        <input type="file" id="video" name="video"
+               accept="video/mp4,video/quicktime,video/x-msvideo" required />
+      </div>
+
+      <button type="submit" id="submit-btn">Analyze gameplay</button>
+    </form>
+
+    <div id="loading" class="loading hidden">
+      <div class="spinner"></div>
+      <span>Analyzing gameplay — this can take up to a minute...</span>
+    </div>
+
+    <div id="error" class="error-box hidden"></div>
+
+    <section id="results" class="results hidden"></section>
+  </main>
+
+  <script>
+    // ===================================================================
+    // IMPORTANT: set this to your deployed backend's URL before uploading
+    // this file to a static host (Netlify Drop / Vercel / GitHub Pages).
+    // Example: const API_BASE = "https://soccer-feedback-api.onrender.com";
+    // Leave "" only if this file is served from the same origin as the API.
+    // ===================================================================
+    const API_BASE = "";
+
+    const form = document.getElementById("analyze-form");
+    const submitBtn = document.getElementById("submit-btn");
+    const loadingEl = document.getElementById("loading");
+    const errorEl = document.getElementById("error");
+    const resultsEl = document.getElementById("results");
+
+    function show(el) { el.classList.remove("hidden"); }
+    function hide(el) { el.classList.add("hidden"); }
+
+    function escapeHtml(str) {
+      const div = document.createElement("div");
+      div.textContent = str == null ? "" : String(str);
+      return div.innerHTML;
+    }
+
+    function listSection(title, items) {
+      const safeItems = Array.isArray(items) ? items : [];
+      const body = safeItems.length
+        ? `<ul>${safeItems.map((i) => `<li>${escapeHtml(i)}</li>`).join("")}</ul>`
+        : `<p class="muted">None noted.</p>`;
+      return `<section class="result-section"><h2>${escapeHtml(
+        title
+      )}</h2>${body}</section>`;
+    }
+
+    function renderReport(report) {
+      const parts = [];
+
+      if (!report.player_identified) {
+        parts.push(
+          `<div class="warn-box"><strong>Player could not be confidently identified.</strong><br>${escapeHtml(
+            report.identification_note
+          )}</div>`
+        );
+      } else if (report.identification_note) {
+        parts.push(
+          `<section class="result-section"><h2>Identification</h2><p>${escapeHtml(
+            report.identification_note
+          )}</p></section>`
+        );
+      }
+
+      const frames = Array.isArray(report.frame_by_frame)
+        ? report.frame_by_frame
+        : [];
+      let framesBody;
+      if (frames.length) {
+        framesBody = frames
+          .map(
+            (f) =>
+              `<div class="frame-card"><div class="frame-label">Frame ${escapeHtml(
+                f.frame_number
+              )} — ${escapeHtml(f.timestamp)}</div><div>${escapeHtml(
+                f.feedback
+              )}</div></div>`
+          )
+          .join("");
+      } else {
+        framesBody = `<p class="muted">No frame-by-frame breakdown available.</p>`;
+      }
+      parts.push(
+        `<section class="result-section"><h2>Frame-by-frame breakdown</h2>${framesBody}</section>`
+      );
+
+      parts.push(
+        `<section class="result-section"><h2>Overall assessment</h2><p>${escapeHtml(
+          report.overall_assessment
+        )}</p></section>`
+      );
+
+      parts.push(listSection("Strengths", report.strengths));
+      parts.push(listSection("Weaknesses", report.weaknesses));
+      parts.push(
+        listSection("Improvement suggestions", report.improvement_suggestions)
+      );
+
+      resultsEl.innerHTML = parts.join("");
+      show(resultsEl);
+    }
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+
+      hide(errorEl);
+      hide(resultsEl);
+      resultsEl.innerHTML = "";
+      show(loadingEl);
+      submitBtn.disabled = true;
+
+      try {
+        const formData = new FormData(form);
+        const response = await fetch(`${API_BASE}/api/analyze`, {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!response.ok) {
+          let detail = "Something went wrong analyzing the video.";
+          try {
+            const err = await response.json();
+            if (err && err.detail) detail = err.detail;
+          } catch (_) {}
+          throw new Error(detail);
+        }
+
+        const report = await response.json();
+        renderReport(report);
+      } catch (err) {
+        errorEl.textContent = err.message || "Something went wrong.";
+        show(errorEl);
+      } finally {
+        hide(loadingEl);
+        submitBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
