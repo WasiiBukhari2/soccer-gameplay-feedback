@@ -15,7 +15,14 @@ const submitBtn = document.getElementById("submit-btn");
 const loadingEl = document.getElementById("loading");
 const loadingText = document.getElementById("loading-text");
 const errorEl = document.getElementById("error");
-const resultsEl = document.getElementById("results");
+const reportContent = document.getElementById("report-content");
+const reportEmpty = document.getElementById("report-empty");
+const dashHighlights = document.getElementById("dash-highlights");
+const navReport = document.getElementById("nav-report");
+
+// Frames extracted in the browser for the current run — reused as report
+// thumbnails so no extra data is fetched.
+let extractedFrames = [];
 
 function show(el) {
   el.classList.remove("hidden");
@@ -186,16 +193,86 @@ async function extractFrames(file, onProgress) {
   return frames;
 }
 
+// --- View switching (sidebar nav) ---
+
+const views = {
+  dashboard: document.getElementById("view-dashboard"),
+  report: document.getElementById("view-report"),
+};
+const navButtons = document.querySelectorAll(".nav-item");
+
+function switchView(name) {
+  Object.entries(views).forEach(([key, el]) => {
+    el.classList.toggle("hidden", key !== name);
+  });
+  navButtons.forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.view === name);
+  });
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+navButtons.forEach((btn) => {
+  btn.addEventListener("click", () => {
+    if (btn.disabled) return;
+    switchView(btn.dataset.view);
+  });
+});
+
 // --- Rendering ---
 
-function listSection(title, items) {
-  const safeItems = Array.isArray(items) ? items : [];
-  const body = safeItems.length
-    ? `<ul>${safeItems.map((i) => `<li>${escapeHtml(i)}</li>`).join("")}</ul>`
-    : `<p class="muted">None noted.</p>`;
-  return `<section class="result-section"><h2>${escapeHtml(
-    title
-  )}</h2>${body}</section>`;
+function setTile(id, value, stateClass) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = value;
+  const tile = el.closest(".tile");
+  if (tile) {
+    tile.classList.remove("tile-good", "tile-warn", "tile-bad");
+    if (stateClass) tile.classList.add(stateClass);
+  }
+}
+
+function markerList(items, kind) {
+  const safe = Array.isArray(items) ? items : [];
+  if (!safe.length) return `<p class="muted">None noted.</p>`;
+  return `<ul class="lined ${kind}">${safe
+    .map((i) => `<li>${escapeHtml(i)}</li>`)
+    .join("")}</ul>`;
+}
+
+function renderDashboard(report) {
+  const identified = !!report.player_identified;
+  const strengths = Array.isArray(report.strengths) ? report.strengths : [];
+  const weaknesses = Array.isArray(report.weaknesses) ? report.weaknesses : [];
+
+  setTile("val-id", identified ? "Yes" : "No", identified ? "tile-good" : "tile-warn");
+  setTile("val-frames", extractedFrames.length);
+  setTile("val-strengths", strengths.length, strengths.length ? "tile-good" : null);
+  setTile("val-weaknesses", weaknesses.length, weaknesses.length ? "tile-bad" : null);
+
+  let html = "";
+  if (!identified) {
+    html += `<div class="warn-box"><strong>Player not confidently identified.</strong><br>${escapeHtml(
+      report.identification_note
+    )}</div>`;
+  }
+  html += `<div class="panel highlight-panel">
+      <h2>Summary</h2>
+      <p>${escapeHtml(report.overall_assessment || "No overall assessment available.")}</p>
+      <button type="button" class="ghost-btn" id="goto-report">View full report →</button>
+    </div>`;
+
+  dashHighlights.innerHTML = html;
+  show(dashHighlights);
+  const goto = document.getElementById("goto-report");
+  if (goto) goto.addEventListener("click", () => switchView("report"));
+}
+
+// Match a report frame to the browser-extracted image by frame number (1-based),
+// falling back to positional order.
+function thumbFor(frameNumber, index) {
+  const idx = Number.isFinite(frameNumber) ? frameNumber - 1 : index;
+  const frame = extractedFrames[idx] || extractedFrames[index];
+  return frame ? frame.data : null;
 }
 
 function renderReport(report) {
@@ -221,20 +298,25 @@ function renderReport(report) {
   let framesBody;
   if (frames.length) {
     framesBody = frames
-      .map(
-        (f) =>
-          `<div class="frame-card"><div class="frame-label">Frame ${escapeHtml(
-            f.frame_number
-          )} — ${escapeHtml(f.timestamp)}</div><div>${escapeHtml(
-            f.feedback
-          )}</div></div>`
-      )
+      .map((f, i) => {
+        const thumb = thumbFor(f.frame_number, i);
+        const img = thumb
+          ? `<img class="frame-thumb" src="data:image/jpeg;base64,${thumb}" alt="Frame ${escapeHtml(
+              f.frame_number
+            )}" />`
+          : `<div class="frame-thumb frame-thumb--empty">no image</div>`;
+        return `<div class="frame-item">${img}<div class="frame-body"><div class="frame-label">Frame ${escapeHtml(
+          f.frame_number
+        )} · ${escapeHtml(f.timestamp)}</div><p>${escapeHtml(
+          f.feedback
+        )}</p></div></div>`;
+      })
       .join("");
   } else {
     framesBody = `<p class="muted">No frame-by-frame breakdown available.</p>`;
   }
   parts.push(
-    `<section class="result-section"><h2>Frame-by-frame breakdown</h2>${framesBody}</section>`
+    `<section class="result-section"><h2>Frame-by-frame breakdown</h2><div class="frame-list">${framesBody}</div></section>`
   );
 
   parts.push(
@@ -243,14 +325,28 @@ function renderReport(report) {
     )}</p></section>`
   );
 
-  parts.push(listSection("Strengths", report.strengths));
-  parts.push(listSection("Weaknesses", report.weaknesses));
   parts.push(
-    listSection("Improvement suggestions", report.improvement_suggestions)
+    `<section class="result-section"><h2>Strengths</h2>${markerList(
+      report.strengths,
+      "good"
+    )}</section>`
+  );
+  parts.push(
+    `<section class="result-section"><h2>Weaknesses</h2>${markerList(
+      report.weaknesses,
+      "bad"
+    )}</section>`
+  );
+  parts.push(
+    `<section class="result-section"><h2>Improvement suggestions</h2>${markerList(
+      report.improvement_suggestions,
+      "info"
+    )}</section>`
   );
 
-  resultsEl.innerHTML = parts.join("");
-  show(resultsEl);
+  reportContent.innerHTML = parts.join("");
+  hide(reportEmpty);
+  show(reportContent);
 }
 
 // --- Submit flow ---
@@ -259,8 +355,6 @@ form.addEventListener("submit", async (event) => {
   event.preventDefault();
 
   hide(errorEl);
-  hide(resultsEl);
-  resultsEl.innerHTML = "";
   submitBtn.disabled = true;
 
   const file = document.getElementById("video").files[0];
@@ -272,11 +366,11 @@ form.addEventListener("submit", async (event) => {
 
     show(loadingEl);
     loadingText.textContent = "Extracting frames in your browser...";
-    const frames = await extractFrames(file, (done, total) => {
+    extractedFrames = await extractFrames(file, (done, total) => {
       loadingText.textContent = `Extracting frames (${done}/${total})...`;
     });
 
-    if (!frames.length) {
+    if (!extractedFrames.length) {
       throw new Error(
         "No frames could be extracted. Please try an MP4 (H.264) file."
       );
@@ -287,7 +381,7 @@ form.addEventListener("submit", async (event) => {
     const response = await fetch(`${API_BASE}/api/analyze`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ jersey_number, jersey_color, frames }),
+      body: JSON.stringify({ jersey_number, jersey_color, frames: extractedFrames }),
     });
 
     if (!response.ok) {
@@ -302,7 +396,12 @@ form.addEventListener("submit", async (event) => {
     }
 
     const report = await response.json();
+    renderDashboard(report);
     renderReport(report);
+
+    // Unlock the Report tab now that there's something to show.
+    navReport.disabled = false;
+    navReport.classList.remove("disabled");
   } catch (err) {
     errorEl.textContent = err.message || "Something went wrong.";
     show(errorEl);
