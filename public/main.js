@@ -239,6 +239,74 @@ function markerList(items, kind) {
     .join("")}</ul>`;
 }
 
+// --- Play-phase filtering (client-side heuristic) ---
+// The backend returns no phase labels, so each frame's phase is inferred from
+// keywords in its feedback text. Listed most-specific first so ties resolve to
+// the more specific phase.
+const PHASES = [
+  {
+    key: "setpieces",
+    label: "Set Pieces",
+    keywords: [
+      "set piece", "set-piece", "corner", "free kick", "free-kick",
+      "throw-in", "throw in", "penalty", "kick-off", "kickoff", "restart",
+      "dead ball",
+    ],
+  },
+  {
+    key: "transition",
+    label: "Transition",
+    keywords: [
+      "transition", "counter", "turnover", "regain", "win possession",
+      "lost possession", "loses possession", "losing possession",
+      "switch play", "switch of play", "break forward", "quick break",
+      "second ball", "recover possession",
+    ],
+  },
+  {
+    key: "defending",
+    label: "Defending",
+    keywords: [
+      "defend", "defens", "tackle", "marking", "mark up", "man-mark",
+      "press", "pressing", "block", "intercept", "cover", "track back",
+      "tracking back", "recover", "clearance", "clear the ball", "contain",
+      "duel", "win the ball", "jockey", "screen", "challenge",
+    ],
+  },
+  {
+    key: "attacking",
+    label: "Attacking",
+    keywords: [
+      "attack", "shot", "shoot", "finish", "dribbl", "cross", "through ball",
+      "chance", "cut inside", "final third", "in behind", "forward run",
+      "overlap", "one-two", "assist", "take on", "goal", "penetrat",
+    ],
+  },
+];
+
+const PHASE_LABEL = {
+  attacking: "Attacking",
+  defending: "Defending",
+  transition: "Transition",
+  setpieces: "Set Pieces",
+  general: "General",
+};
+
+function classifyPhase(text) {
+  const t = (text || "").toLowerCase();
+  let best = "general";
+  let bestScore = 0;
+  for (const phase of PHASES) {
+    let score = 0;
+    for (const kw of phase.keywords) if (t.includes(kw)) score++;
+    if (score > bestScore) {
+      bestScore = score;
+      best = phase.key;
+    }
+  }
+  return best;
+}
+
 function renderDashboard(report) {
   const identified = !!report.player_identified;
   const strengths = Array.isArray(report.strengths) ? report.strengths : [];
@@ -297,26 +365,55 @@ function renderReport(report) {
     : [];
   let framesBody;
   if (frames.length) {
-    framesBody = frames
-      .map((f, i) => {
-        const thumb = thumbFor(f.frame_number, i);
+    const classified = frames.map((f, i) => ({
+      ...f,
+      _index: i,
+      phase: classifyPhase(f.feedback),
+    }));
+
+    const counts = { all: classified.length };
+    PHASES.forEach((p) => (counts[p.key] = 0));
+    classified.forEach((f) => {
+      if (counts[f.phase] !== undefined) counts[f.phase] += 1;
+    });
+
+    const tabs =
+      `<div class="phase-tabs" role="tablist">` +
+      `<button type="button" class="phase-tab active" data-phase="all">All <span class="count">${counts.all}</span></button>` +
+      PHASES.map(
+        (p) =>
+          `<button type="button" class="phase-tab" data-phase="${p.key}">${p.label} <span class="count">${counts[p.key]}</span></button>`
+      ).join("") +
+      `</div>` +
+      `<p class="phase-note muted small">Phases are auto-detected from the feedback text, so they're an approximation.</p>`;
+
+    const cards = classified
+      .map((f) => {
+        const thumb = thumbFor(f.frame_number, f._index);
         const img = thumb
           ? `<img class="frame-thumb" src="data:image/jpeg;base64,${thumb}" alt="Frame ${escapeHtml(
               f.frame_number
             )}" />`
           : `<div class="frame-thumb frame-thumb--empty">no image</div>`;
-        return `<div class="frame-item">${img}<div class="frame-body"><div class="frame-label">Frame ${escapeHtml(
+        return `<div class="frame-item" data-phase="${f.phase}">${img}<div class="frame-body"><div class="frame-label">Frame ${escapeHtml(
           f.frame_number
-        )} · ${escapeHtml(f.timestamp)}</div><p>${escapeHtml(
+        )} · ${escapeHtml(f.timestamp)}<span class="phase-badge phase-${
+          f.phase
+        }">${PHASE_LABEL[f.phase]}</span></div><p>${escapeHtml(
           f.feedback
         )}</p></div></div>`;
       })
       .join("");
+
+    framesBody =
+      tabs +
+      `<div class="frame-list">${cards}</div>` +
+      `<p class="filter-empty muted hidden">No moments were detected for this phase.</p>`;
   } else {
     framesBody = `<p class="muted">No frame-by-frame breakdown available.</p>`;
   }
   parts.push(
-    `<section class="result-section"><h2>Frame-by-frame breakdown</h2><div class="frame-list">${framesBody}</div></section>`
+    `<section class="result-section"><h2>Frame-by-frame breakdown</h2>${framesBody}</section>`
   );
 
   parts.push(
@@ -347,6 +444,30 @@ function renderReport(report) {
   reportContent.innerHTML = parts.join("");
   hide(reportEmpty);
   show(reportContent);
+  setupPhaseFilter();
+}
+
+function applyPhaseFilter(phase) {
+  const items = reportContent.querySelectorAll(".frame-item");
+  let visible = 0;
+  items.forEach((item) => {
+    const match = phase === "all" || item.dataset.phase === phase;
+    item.classList.toggle("filtered-out", !match);
+    if (match) visible += 1;
+  });
+  const empty = reportContent.querySelector(".filter-empty");
+  if (empty) empty.classList.toggle("hidden", visible !== 0);
+}
+
+function setupPhaseFilter() {
+  const tabs = reportContent.querySelectorAll(".phase-tab");
+  tabs.forEach((tab) => {
+    tab.addEventListener("click", () => {
+      tabs.forEach((t) => t.classList.remove("active"));
+      tab.classList.add("active");
+      applyPhaseFilter(tab.dataset.phase);
+    });
+  });
 }
 
 // --- Submit flow ---
